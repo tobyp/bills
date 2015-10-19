@@ -1,0 +1,25 @@
+# Bill 1: Mom-&-Pop Store, 1970-01-01
+A	BC	2.00	# A paid 2.00, benefiting B and C
+A	A	5.00	# A paid 5.00, but only for themselves
+A	ABC	10.00	# A paid 10.00, and whatever was bought got split evenly.
+# Bill 2
+B	A	2.00
+B	AB	3.00
+# Cash exchange
+C	B	8.88	# C gave B some cash
+
+# The algorithm is to track an "account" for each person:
+# Whenever they pay something, subtract that from their account
+# Whenever they receive something, add that to their account.
+# Once all transactions are tracked, shovel cash from people with positive
+# balances to people with negative balances until everyone reaches 0.
+
+# Compile and run the script to figure out how to get even:
+# ghc bills.hs -o bills
+# ./bills < bills.txt
+
+# Output:
+# B pays 5.1666665 to A
+# B pays 4.5466666 to C
+
+# Newline at end of file:
