@@ -1,0 +1,9 @@
+# Bill 1: Mom-&-Pop Store, 1970-01-01
+A	BC	2.00
+A	A	5.00
+A	ABC	10.00
+# Bill 2: Hot Dog Stand, 1999-12-31
+B	A	2.00
+B	AB	3.00
+# Cash exchange, 2015-03-14
+C	B	8.88
