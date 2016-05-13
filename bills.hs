@@ -3,6 +3,7 @@ import Text.Printf
 import Data.Ratio
 import Data.Maybe
 import GHC.Exts
+import Control.Monad (void)
 
 person = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 whitespace = oneOf " \t\v"
@@ -30,10 +31,11 @@ line = do
     e <- optionMaybe entry
     skipMany whitespace
     optional comment
-    char '\n'
     return e
 
-bills = many line
+eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
+
+bills = sepEndBy line eol
 
 type Person = Char
 type Money = Ratio Integer
