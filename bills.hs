@@ -8,11 +8,23 @@ import Control.Monad (void)
 person = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 whitespace = oneOf " \t\v"
 
-amount = do
-    prefix <- many1 digit
+amount = (try amount_frac) <|> (try amount_dec) <|> (try amount_int)
+
+amount_int = do
+    n <- many1 digit
+    return $ (read n) % 1
+
+amount_dec = do
+    intpart <- many1 digit
     char '.'
-    suffix <- many1 digit
-    return $ (((read prefix) * 100) + (read suffix)) % (100 :: Integer)
+    fracpart <- many1 digit
+    return $ (read intpart) % 1 + (read fracpart) % (10 ^ (length fracpart))
+
+amount_frac = do
+    numerator <- many1 digit
+    char '/'
+    denominator <- many1 digit
+    return $ (read numerator) % (read denominator)
 
 comment = do
     char '#'
