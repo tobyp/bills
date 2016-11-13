@@ -8,23 +8,27 @@ import Control.Monad (void)
 person = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 whitespace = oneOf " \t\v"
 
-amount = (try amount_frac) <|> (try amount_dec) <|> (try amount_int)
-
-amount_int = do
-    n <- many1 digit
-    return $ (read n) % 1
-
-amount_dec = do
+expr_num = do
     intpart <- many1 digit
-    char '.'
-    fracpart <- many1 digit
-    return $ (read intpart) % 1 + (read fracpart) % (10 ^ (length fracpart))
+    fracpart <- option (0 % 1) $ do {
+        oneOf ".,";
+        fracpart <- many1 digit;
+        return $ (read fracpart) % (10 ^ (length fracpart)) }
+    return $ (read intpart) % 1 + fracpart
 
-amount_frac = do
-    numerator <- many1 digit
+expr_mul = do
+    left <- expr_num
+    char '*'
+    right <- expr_num
+    return (left * right)
+
+expr_div = do
+    left <- expr_num
     char '/'
-    denominator <- many1 digit
-    return $ (read numerator) % (read denominator)
+    right <- expr_num
+    return (left / right)
+
+expr = (try expr_div) <|> (try expr_mul) <|> expr_num
 
 comment = do
     char '#'
@@ -35,7 +39,7 @@ entry = do
     many1 space
     creditors <- many1 person
     many1 space
-    amnt <- amount
+    amnt <- expr
     return (debitor, creditors, amnt)
 
 line = do
