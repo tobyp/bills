@@ -16,19 +16,15 @@ expr_num = do
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
-expr_mul = do
-    left <- expr_num
-    char '*'
-    right <- expr_num
-    return (left * right)
-
-expr_div = do
-    left <- expr_num
-    char '/'
-    right <- expr_num
-    return (left / right)
-
-expr = (try expr_div) <|> (try expr_mul) <|> expr_num
+expr = try (do {
+        left <- expr_num;
+        char '*';
+        right <- expr_num;
+        return (left * right) }) <|> try (do {
+            left <- expr_num;
+            char '/';
+            right <- expr_num;
+            return (left / right) }) <|> expr_num
 
 comment = do
     char '#'
@@ -51,7 +47,10 @@ line = do
 
 eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 
-bills = sepEndBy line eol
+bills = do
+    lines <- sepEndBy line eol
+    eof
+    return lines
 
 type Person = Char
 type Money = Ratio Integer
