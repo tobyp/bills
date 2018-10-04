@@ -1,4 +1,4 @@
-Copyright (c) 2016 tobyp
+Copyright (c) 2016, 2018 tobyp
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -5,38 +5,62 @@ import Data.Maybe
 import GHC.Exts
 import Control.Monad (void)
 
-person = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-whitespace = oneOf " \t\v"
+type Person = String
+type Money = Ratio Integer
+type Weight = Ratio Integer
 
-expr_num = do
+data Share = Share Person Weight deriving Show
+data Account = Account Person Money deriving Show
+data Transaction = Transaction Person Money deriving Show
+
+large = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+small = oneOf "_abcdefghijklmnopqrstuvwxyz"
+whitespace = oneOf " \t\v"
+decimalSeparator = oneOf ".,"
+
+person = do
+    a <- large
+    b <- many small
+    return (a:b)
+
+number = do
     intpart <- many1 digit
     fracpart <- option (0 % 1) $ do {
-        oneOf ".,";
+        decimalSeparator;
         fracpart <- many1 digit;
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
-expr = try (do {
-        left <- expr_num;
-        char '*';
-        right <- expr_num;
-        return (left * right) }) <|> try (do {
-            left <- expr_num;
-            char '/';
-            right <- expr_num;
-            return (left / right) }) <|> expr_num
+share_person = do
+    who <- person
+    return [Share who (1 % 1)]
+
+share_paren = do
+    char '('
+    shs <- shares
+    char ')'
+    return shs
+
+share = do
+    weight <- option (1 % 1) number
+    shs <- try share_person <|> share_paren
+    return $ scaleShare  (1 / weight) <$> shs
+
+shares = do
+    shs <- sepBy1 share (optional $ char ',')
+    return $ normalizeShares $ concat shs
 
 comment = do
     char '#'
     many $ noneOf "\n"
 
 entry = do
-    debitor <- person
+    creditors <- shares
     many1 space
-    creditors <- many1 person
+    debtors <- shares
     many1 space
-    amnt <- expr
-    return (debitor, creditors, amnt)
+    amount <- number
+    return $ shareTransaction creditors amount debtors
 
 line = do
     skipMany whitespace
@@ -50,44 +74,57 @@ eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 bills = do
     lines <- sepEndBy line eol
     eof
-    return lines
+    return $ concat $ catMaybes lines
 
-type Person = Char
-type Money = Ratio Integer
+scaleShare :: Weight -> Share -> Share
+scaleShare scalar (Share p w) = Share p (w / scalar)
 
--- convert "bill lines" (A paid X for B, C and D) into account any number of transactions (A loses/gains a value of X)
-itemdeltas :: (Person, [Person], Money) -> [(Person, Money)]
-itemdeltas (_, [], _) = error "Invalid item: no creditors"
-itemdeltas (d, cs, m) = [(d, -m)]++splitparts cs (m / ((toInteger (length cs)) % (toInteger 1)))
-    where splitparts cs mper = [(c, mper) | c <- cs]
+-- scale shares linearly until the sum of all share weights is 1
+normalizeShares :: [Share] -> [Share]
+normalizeShares shares = scaleShare total <$> shares
+    where
+        total = foldl (+) (0 % 1) $ shareWeight <$> shares
+        shareWeight (Share _ w) = w
 
--- apply a transaction to a list of accounts: transaction -> accounts_before_transaction -> accounts_after_transaction
-applydelta :: (Person, Money) -> [(Person, Money)] -> [(Person, Money)]
-applydelta d@(p, m) [] = [d]
-applydelta d@(p, m) (a@(ap, am):as)
-    | ap == p = (p, m+am):as
-    | otherwise = a:(applydelta d as)
+-- split a multiple-shares transaction into separate one-person transactions
+-- shareTransaction creditor_shares amount debtor_shares = one_person_transactions
+shareTransaction :: [Share] -> Money -> [Share] -> [Transaction]
+shareTransaction = go []
+    where
+        go txs [] _ [] = txs
+        go txs [] m ((Share p w):ds) = go ((Transaction p (w * m)):txs) [] m ds
+        go txs ((Share p w):cs) m ds = go ((Transaction p (-w * m)):txs) cs m ds
+
+-- apply a transaction to a list of accounts: before -> transaction -> after
+applyTransaction :: [Account] -> Transaction -> [Account]
+applyTransaction [] (Transaction p m) = [Account p m]
+applyTransaction (a@(Account ap am):as) t@(Transaction p m)
+    | ap == p = (Account p (m + am)):as
+    | otherwise = a:(applyTransaction as t)
 
 -- recursively calculate transfers from the biggest debitor to the biggest creditor until no credits/debits are left.
 -- this algorithm only works because we always know there will be at least two accounts (otherwise somebody would owe, but nobody would be owed) and the sum of all credits+debits is 0
-collapseAccounts :: [(Person, Money)] -> IO ()
+collapseAccounts :: [Account] -> IO ()
 collapseAccounts [] = return ()
 collapseAccounts accs = do
-    printf "%c pays %f to %c\n" debitor (((fromRational baseline) :: Float)) creditor
-    collapseAccounts $ filter (\(p, m) -> m /= 0) $ (creditor, credit + baseline):(debitor, debit - baseline):otherAccs
+    printf "%s pays %f to %s\n" debitor (((fromRational baseline) :: Float)) creditor
+    collapseAccounts $ filter accountNotEmpty $ modifiedAccounts
         where
-            ((creditor, credit), (debitor, debit), otherAccs) = minMaxAccounts accs
+            accountNotEmpty (Account _ m) = m /= 0
+            modifiedAccounts = (Account creditor (credit + baseline)):(Account debitor (debit - baseline)):otherAccs
             baseline = min (-credit) debit
+            ((Account creditor credit), (Account debitor debit), otherAccs) = minMaxAccounts accs
 
--- separate out the biggest creditor and debitor from an account list
-minMaxAccounts :: [(Person, Money)] -> ((Person, Money), (Person, Money), [(Person, Money)])
+-- separate out the biggest creditor and debitor from an account list (of length >= 2!)
+minMaxAccounts :: [Account] -> (Account, Account, [Account])
+minMaxAccounts [] = error "no accounts"
+minMaxAccounts (_:[]) = error "not enough accounts"
 minMaxAccounts accs = (minAcc, maxAcc, restAccs)
     where
-        sortedAccs = sortWith (\(p, m) -> m) accs
+        sortedAccs = sortWith (\(Account _ m) -> m) accs
         (minAcc:[], restMaxAccs) = splitAt 1 sortedAccs
         (restAccs, maxAcc:[]) = splitAt (length restMaxAccs - 1) restMaxAccs
 
--- parse the input and collapse the accounts
 main :: IO ()
 main = do
     content <- getContents
@@ -95,6 +132,5 @@ main = do
         Left err -> do
             putStrLn "Parsing Failed."
             print err
-        Right items -> do
-            collapseAccounts accounts
-                where accounts = (foldr applydelta [] $ concat [itemdeltas i | i <- catMaybes items])
+        Right transactions -> do
+            collapseAccounts $ foldl applyTransaction [] transactions
