@@ -24,6 +24,7 @@ person = do
     return (a:b)
 
 number = do
+    sign <- option (1 % 1) ((char '-') >> (return (-1 % 1)))
     intpart <- many1 digit
     fracpart <- option (0 % 1) $ do {
         decimalSeparator;
