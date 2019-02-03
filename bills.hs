@@ -45,6 +45,7 @@ share_paren = do
 share = do
     weight <- option (1 % 1) number
     shs <- try share_person <|> share_paren
+    optional $ char '.'
     return $ scaleShare  (1 / weight) <$> shs
 
 shares = do
