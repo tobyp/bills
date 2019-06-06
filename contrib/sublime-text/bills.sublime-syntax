@@ -1,0 +1,74 @@
+%YAML 1.2
+---
+name: "Bills"
+scope: text.bills
+file_extensions: ["bills"]
+# this works if "bills" is in your $PATH
+first_line_match: "#!/usr/bin/env bills"
+
+variables:
+  person: "[A-Z][_a-z]*"
+  number: "-?\\d+([.,]\\d+)?"
+  whitespace: "[ \t\v]"
+
+contexts:
+  main:
+    - include: comment
+    - include: entry
+
+  comment:
+    - match: "(#+)[^$]*"
+      scope: comment.line
+      captures:
+        1: punctuation.definition.comment
+
+  entry:
+    - match: "(?=[A-Z]|[-0-9]|[(])"
+      set: entry_creditor
+  
+  entry_creditor:
+    - match: "(?=[A-Z]|[-0-9]|[(])"
+      push: creditor_share
+    - match: "{{whitespace}}+"
+      set: entry_debitor
+
+  entry_debitor:
+    - match: "(?=[A-Z]|[-0-9]|[(])"
+      push: debitor_share
+    - match: \.
+      scope: markup.bold
+    - match: "{{whitespace}}+"
+      set: entry_amount
+
+  entry_amount:
+    - match: "{{number}}"
+      scope: constant.numeric.amount
+    - match: "{{whitespace}}+"
+      set: main
+
+  creditor_share:
+    - meta_scope: markup.inserted.creditor
+    - include: share
+
+  debitor_share:
+    - meta_scope: markup.deleted.debitor
+    - include: share
+
+  share:
+    - match: "{{number}}"
+      scope: constant.numeric.weight
+    - match: "{{person}}"
+      scope: markup.person
+    - match: \(
+      scope: punctuation.section.brackets.begin
+      push: group_share
+    - match: (?=\.)
+      pop: true
+    - match: "(?={{whitespace}})"
+      pop: true
+
+  group_share:
+    - match: \)
+      scope: punctuation.section.brackets.end
+      pop: true
+    - include: share
