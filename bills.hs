@@ -3,7 +3,6 @@ import Text.Printf
 import Data.Ratio
 import Data.Maybe
 import GHC.Exts
-import Control.Monad (void)
 
 type Person = String
 type Money = Ratio Integer
@@ -12,6 +11,8 @@ type Weight = Ratio Integer
 data Share = Share Person Weight deriving Show
 data Account = Account Person Money deriving Show
 data Transaction = Transaction Person Money deriving Show
+
+mkShare p = Share p (1 % 1)
 
 large = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 small = oneOf "_abcdefghijklmnopqrstuvwxyz"
@@ -32,24 +33,16 @@ number = do
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
-share_person = do
-    who <- person
-    return [Share who (1 % 1)]
-
-share_paren = do
-    char '('
-    shs <- shares
-    char ')'
-    return shs
-
+share_person = person >>= return . (:[]) . mkShare
+share_paren = between (char '(') (char ')') shares
 share = do
     weight <- option (1 % 1) number
     shs <- try share_person <|> share_paren
-    optional $ char '.'
-    return $ scaleShare  (1 / weight) <$> shs
+    return $ scaleShare (1 / weight) <$> shs
 
 shares = do
     shs <- sepBy1 share (optional $ char ',')
+    optional $ char '.'
     return $ normalizeShares $ concat shs
 
 comment = do
