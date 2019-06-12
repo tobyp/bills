@@ -2,6 +2,7 @@ import Text.Parsec
 import Text.Printf
 import Data.Ratio
 import Data.Maybe
+import qualified Data.Map.Strict as M
 import GHC.Exts
 
 type Person = String
@@ -12,9 +13,14 @@ data Share = Share Person Weight deriving Show
 data Account = Account Person Money deriving Show
 data Transaction = Transaction Person Money deriving Show
 
-mkShare p = Share p (1 % 1)
+type ParserState = M.Map Person [Share]
+initParserState :: ParserState
+initParserState = M.empty
 
-large = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+mkShares :: ParserState -> Person -> [Share]
+mkShares m p = M.findWithDefault [Share p 1] p m
+
+large = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 small = oneOf "_abcdefghijklmnopqrstuvwxyz"
 whitespace = oneOf " \t\v"
 decimalSeparator = oneOf ".,"
@@ -25,7 +31,7 @@ person = do
     return (a:b)
 
 number = do
-    sign <- option (1 % 1) ((char '-') >> (return (-1 % 1)))
+    sign <- option (1) ((char '-') >> (return (-1 % 1)))
     intpart <- many1 digit
     fracpart <- option (0 % 1) $ do {
         decimalSeparator;
@@ -33,36 +39,63 @@ number = do
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
-share_person = person >>= return . (:[]) . mkShare
-share_paren = between (char '(') (char ')') shares
-share = do
-    weight <- option (1 % 1) number
-    shs <- try share_person <|> share_paren
-    return $ scaleShare (1 / weight) <$> shs
+share_person = do
+    p <- person
+    s <- getState
+    return $ mkShares s p
 
-shares = do
-    shs <- sepBy1 share (optional $ char ',')
-    optional $ char '.'
-    return $ normalizeShares $ concat shs
+share_paren = between (char '(') (char ')') shareList
+
+share = do
+    weight <- option (1) number
+    shares <- try share_person <|> share_paren
+    return $ scaleShare (1 / weight) <$> shares
+
+shareList = do
+    shares <- sepBy1 share (optional $ char ',')
+    return $ normalizeShares $ concat shares
 
 comment = do
     char '#'
     many $ noneOf "\n"
 
 entry = do
-    creditors <- shares
+    creditors <- shareList
     many1 space
-    debtors <- shares
+    debtors <- shareList
+    optional $ char '.'
     many1 space
     amount <- number
     return $ shareTransaction creditors amount debtors
 
-line = do
+line_define = do
+    string "%define"
+    skipMany whitespace
+    token <- person
+    skipMany whitespace
+    shares <- shareList
+    skipMany whitespace
+    optional comment
+    modifyState $ M.insert token $ normalizeShares shares
+    return Nothing
+
+line_undefine = do
+    string "%undefine"
+    skipMany whitespace
+    token <- person
+    skipMany whitespace
+    optional comment
+    modifyState $ M.delete token
+    return Nothing
+
+line_entry = do
     skipMany whitespace
     e <- optionMaybe entry
     skipMany whitespace
     optional comment
     return e
+
+line = try line_define <|> try line_undefine <|> line_entry
 
 eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 
@@ -123,7 +156,7 @@ minMaxAccounts accs = (minAcc, maxAcc, restAccs)
 main :: IO ()
 main = do
     content <- getContents
-    case parse bills "<input>" content of
+    case runParser bills initParserState "<input>" content of
         Left err -> do
             putStrLn "Parsing Failed."
             print err
