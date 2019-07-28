@@ -5,7 +5,7 @@ pkgdesc="Bills "
 arch=('any')
 license=('MIT')
 depends=('gmp' 'libffi')
-makedepends=('ghc')
+makedepends=('ghc-static')
 source=("git+https://git.tobyp.net/tobyp/bills-hs.git")
 sha512sums=('SKIP')
 
