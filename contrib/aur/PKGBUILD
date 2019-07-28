@@ -1,0 +1,24 @@
+pkgname=bills
+pkgver=1.0
+pkgrel=1
+pkgdesc="Bills "
+arch=('any')
+license=('MIT')
+depends=('gmp' 'libffi')
+makedepends=('ghc')
+source=("git+https://git.tobyp.net/tobyp/bills-hs.git")
+sha512sums=('SKIP')
+
+build() {
+	cd "bills-hs"
+	make bills
+}
+
+check() {
+	cd "bills-hs"
+	make check
+}
+
+package() {
+	install -Dm755 "bills-hs/bills" "${pkgdir}/usr/bin/bills"
+}

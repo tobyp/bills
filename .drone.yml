@@ -1,0 +1,37 @@
+kind: pipeline
+name: default
+
+steps:
+- name: makepkg
+  image: docker-registry.tobyp.net/tobyp/docker-drone-makepkg
+  environment:
+    PKGBUILD_DIR: contrib/aur
+    PKGBUILD_SRC_OVERRIDE: "git+https://git.tobyp.net/tobyp/bills-hs.git"
+
+- name: repo-add
+  image: docker-registry.tobyp.net/tobyp/docker-drone-pacman-package-deploy
+  when:
+    event:
+      - promote
+  environment:
+    PKGBUILD_DIR: contrib/aur
+    GNUPGHOME: /gnupg
+    PACKAGE_SIGNING_KEY: F9B7DD177A0291FB7543B7804A5909B5F435EA7D
+    REPO: tobyp
+  volumes:
+    - name: repo
+      path: /repo
+    - name: gnupg
+      path: /gnupg
+
+volumes:
+- name: repo
+  host:
+    path: /var/pacman-repository
+- name: gnupg
+  host:
+    path: /var/pacman-repository-gnupg
+ 
+image_pull_secrets:
+- dockerconfigjson
+
