@@ -14,6 +14,7 @@ variables:
 contexts:
   main:
     - include: comment
+    - include: directive
     - include: entry
 
   comment:
@@ -21,6 +22,42 @@ contexts:
       scope: comment.line
       captures:
         1: punctuation.definition.comment
+
+  directive:
+    - match: "(?=%define)"
+      push: directive_define
+    - match: "(?=%undefine)"
+      push: directive_undefine
+
+  directive_define:
+    - match: "%define"
+      scope: keyword.control.define
+    - match: "{{whitespace}}+"
+      set: directive_define_macro
+
+  directive_define_macro:
+    - match: "{{person}}"
+      scope: markup.person
+    - match: "{{whitespace}}+"
+      set: directive_define_definition
+
+  directive_define_definition:
+    - match: "(?=[A-Z]|[-0-9]|[(])"
+      push: common_share
+    - match: "{{whitespace}}+"
+      set: main
+
+  directive_undefine:
+    - match: "%undefine"
+      scope: keyword.control.undefine
+    - match: "{{whitespace}}+"
+      set: directive_undefine_macro
+
+  directive_undefine_macro:
+    - match: "{{person}}"
+      scope: markup.person
+    - match: "{{whitespace}}+"
+      set: main
 
   entry:
     - match: "(?=[A-Z]|[-0-9]|[(])"
@@ -50,6 +87,10 @@ contexts:
     - meta_scope: markup.inserted.creditor
     - include: share
 
+  common_share:
+    - meta_scope: markup.share
+    - include: share
+
   debitor_share:
     - meta_scope: markup.deleted.debitor
     - include: share
@@ -59,9 +100,13 @@ contexts:
       scope: constant.numeric.weight
     - match: "{{person}}"
       scope: markup.person
+    - match: "\\\\"
+      scope: keyword.operator
     - match: \(
       scope: punctuation.section.brackets.begin
       push: group_share
+    - match: "\\?"
+      scope: invalid.illegal
     - match: (?=\.)
       pop: true
     - match: "(?={{whitespace}})"

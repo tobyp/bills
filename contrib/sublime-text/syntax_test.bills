@@ -1,18 +1,18 @@
 #SYNTAX TEST "Packages/bills.sublime-syntax"
     Alice    Bob    3.14  
 #^^^^^^^^^^^^^^^^^^^^^^^^^  text.bills
-#   ^^^^^                   text.bills markup.bold.creditor markup.person
-#            ^^^            text.bills markup.italic.debitor markup.person
+#   ^^^^^                   text.bills markup.inserted.creditor markup.person
+#            ^^^            text.bills markup.deleted.debitor markup.person
 #                   ^^^^    constant.numeric.amount
 
     10A20B    6(AB)5(B).    30    # comment  
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  text.bills
 #                                 ^^^^^^^^^^^ text.bills comment.line
 #                                 ^           text.bills comment.line punctuation.definition.comment
-#     ^                                       text.bills markup.bold.creditor markup.person
-#        ^                                    text.bills markup.bold.creditor markup.person
-#               ^^                            text.bills markup.italic.debitor markup.person
-#                    ^                        text.bills markup.italic.debitor markup.person
+#     ^                                       text.bills markup.inserted.creditor markup.person
+#        ^                                    text.bills markup.inserted.creditor markup.person
+#               ^^                            text.bills markup.deleted.debitor markup.person
+#                    ^                        text.bills markup.deleted.debitor markup.person
 #   ^^                                        constant.numeric.weight
 #      ^^                                     constant.numeric.weight
 #             ^                               constant.numeric.weight
@@ -22,10 +22,20 @@
 #                 ^                           punctuation.section.brackets.end
 #                     ^                       punctuation.section.brackets.end
 #                      ^                      markup.bold
-#                          ^^                 constant.numeric.amount
-#   ^^^^^^                                    markup.bold.creditor
-#             ^^^^^^^^^                       markup.italic.debitor
+#                           ^^                constant.numeric.amount
+#   ^^^^^^                                    markup.inserted.creditor
+#             ^^^^^^^^^                       markup.deleted.debitor
 
 # comment  
 #<-          punctuation.definition.comment
 #^^^^^^^^^^  comment.line
+
+    A  AB\C?
+#        ^    keyword.operator
+#          ^  invalid.illegal
+
+ %define A 1B2C
+#^^^^^^^         keyword.control.define
+
+ %undefine A
+#^^^^^^^^^    keyword.control.undefine
