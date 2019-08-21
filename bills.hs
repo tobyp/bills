@@ -13,12 +13,23 @@ data Share = Share Person Weight deriving Show
 data Account = Account Person Money deriving Show
 data Transaction = Transaction Person Money deriving Show
 
-type ParserState = M.Map Person [Share]
+data ParserState = ParserState {
+    psDefineMap :: M.Map Person [Share],
+    psAllowPlaceholder :: Bool,
+    psAllowUnterminated :: Bool
+}
 initParserState :: ParserState
-initParserState = M.empty
+initParserState = ParserState {
+    psDefineMap=M.empty,
+    psAllowPlaceholder=False,
+    psAllowUnterminated=False
+}
+
+psDefine p s ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.insert p s m}
+psUndefine p ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.delete p m}
 
 mkShares :: ParserState -> Person -> [Share]
-mkShares m p = M.findWithDefault [Share p 1] p m
+mkShares m p = M.findWithDefault [Share p 1] p (psDefineMap m)
 
 sharesExclude :: [Share] -> [Share] -> [Share]
 sharesExclude included excluded = normalizeShares [s | s@(Share p _) <- included, not (p `elem` excludedPersons)]
@@ -54,7 +65,10 @@ share_person = do
 
 share_placeholder = do
     char '?'
-    return []
+    state <- getState
+    if psAllowPlaceholder state
+        then return []
+        else fail "Found placeholder (Entries containing a ? are not allowed)"
 
 -- [Share]
 share_paren = between (char '(') (char ')') shareDifference
@@ -88,10 +102,15 @@ entry = do
     creditors <- shareDifference
     many1 space
     debtors <- shareDifference
-    optional (char '.')
-    many1 space
-    amount <- number
-    return $ shareTransaction creditors amount debtors
+    terminated <- optionMaybe (char '.')
+    state <- getState
+    case (terminated, psAllowUnterminated state) of
+        (Nothing, False) ->
+            fail "Unterminated entry (entries without a . at the end are not allowed)"
+        _ -> do
+            many1 space
+            amount <- number
+            return $ shareTransaction creditors amount debtors
 
 -- Maybe [Transaction]
 line_define = do
@@ -102,7 +121,7 @@ line_define = do
     shares <- shareDifference
     skipMany whitespace
     optional comment
-    modifyState $ M.insert token $ normalizeShares shares
+    modifyState $ psDefine token $ normalizeShares shares
     return Nothing
 
 -- Maybe [Transaction]
@@ -112,7 +131,7 @@ line_undefine = do
     token <- person
     skipMany whitespace
     optional comment
-    modifyState $ M.delete token
+    modifyState $ psUndefine token
     return Nothing
 
 -- Maybe [Transaction]
