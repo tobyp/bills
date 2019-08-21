@@ -40,6 +40,14 @@ This has two main uses (though other, more creative uses, are of course possible
  - Having others pay for a specific person's expenses, e.g. `%define X AB` for `A` and `B` to share all expenses `X` incurs. This is nice when you want to "treat" someone to something, and foot their bill.
 
 Defines will remain in effect until they are removed by an `%undefine` line, and are applied both for creditors and debitors.
+
+### Exclusions
+
+With group-style defines, especially with large groups, it may be convenient to exclude certain members of the group for specific entries, without having to redefine the entire (possible complex) group structure.
+This can be achieved with exclusion syntax, e.g. `ABCD\A`, which is equivalent to `ABC`.
+The `\\` operator binds less tightly than union, but respects parentheses, e.g. `(AB)C\D` is the same as `ABC\D`, and `ABC\(AB\A)` equals `AC`.
+Exclusion disregards weights, and will remove all shares on the left side for any person on the right side, e.g. `5A3B2C6D\1A2B` is equal to `2C6D`.
+
 ## Building
 
 ```

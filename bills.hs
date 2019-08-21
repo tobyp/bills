@@ -20,16 +20,23 @@ initParserState = M.empty
 mkShares :: ParserState -> Person -> [Share]
 mkShares m p = M.findWithDefault [Share p 1] p m
 
+sharesExclude :: [Share] -> [Share] -> [Share]
+sharesExclude included excluded = normalizeShares [s | s@(Share p _) <- included, not (p `elem` excludedPersons)]
+    where
+        excludedPersons = [p | (Share p _) <- excluded]
+
 large = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 small = oneOf "_abcdefghijklmnopqrstuvwxyz"
 whitespace = oneOf " \t\v"
 decimalSeparator = oneOf ".,"
 
+-- String
 person = do
     a <- large
     b <- many small
     return (a:b)
 
+-- Ratio Integer
 number = do
     sign <- option (1) ((char '-') >> (return (-1 % 1)))
     intpart <- many1 digit
@@ -39,46 +46,66 @@ number = do
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
+-- [Share]
 share_person = do
     p <- person
     s <- getState
     return $ mkShares s p
 
-share_paren = between (char '(') (char ')') shareList
+share_placeholder = do
+    char '?'
+    return []
 
+-- [Share]
+share_paren = between (char '(') (char ')') shareDifference
+
+-- [Share]
 share = do
     weight <- option (1) number
-    shares <- try share_person <|> share_paren
+    shares <- try share_person <|> try share_placeholder <|> share_paren
     return $ scaleShare (1 / weight) <$> shares
 
-shareList = do
+-- [Share]
+shareUnion = do
     shares <- sepBy1 share (optional $ char ',')
     return $ normalizeShares $ concat shares
 
+-- [Share]
+shareDifference = do
+    sharesIncluded <- shareUnion
+    sharesExcluded <- option [] $ do
+        char '\\'
+        shareUnion
+    return $ sharesExclude sharesIncluded sharesExcluded
+
+-- ()
 comment = do
     char '#'
     many $ noneOf "\n"
 
+-- [Transaction]
 entry = do
-    creditors <- shareList
+    creditors <- shareDifference
     many1 space
-    debtors <- shareList
-    optional $ char '.'
+    debtors <- shareDifference
+    optional (char '.')
     many1 space
     amount <- number
     return $ shareTransaction creditors amount debtors
 
+-- Maybe [Transaction]
 line_define = do
     string "%define"
     skipMany whitespace
     token <- person
     skipMany whitespace
-    shares <- shareList
+    shares <- shareDifference
     skipMany whitespace
     optional comment
     modifyState $ M.insert token $ normalizeShares shares
     return Nothing
 
+-- Maybe [Transaction]
 line_undefine = do
     string "%undefine"
     skipMany whitespace
@@ -88,6 +115,7 @@ line_undefine = do
     modifyState $ M.delete token
     return Nothing
 
+-- Maybe [Transaction]
 line_entry = do
     skipMany whitespace
     e <- optionMaybe entry
@@ -95,10 +123,12 @@ line_entry = do
     optional comment
     return e
 
+-- Maybe [Transaction]
 line = try line_define <|> try line_undefine <|> line_entry
 
 eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 
+-- [Transaction]
 bills = do
     lines <- sepEndBy line eol
     eof
