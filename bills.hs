@@ -4,6 +4,12 @@ import Data.Ratio
 import Data.Maybe
 import qualified Data.Map.Strict as M
 import GHC.Exts
+import System.Console.GetOpt
+import System.Environment
+import System.Exit
+import System.IO
+
+kVERSION = "2.0.0"
 
 type Person = String
 type Money = Ratio Integer
@@ -202,12 +208,53 @@ minMaxAccounts accs = (minAcc, maxAcc, restAccs)
         (minAcc:[], restMaxAccs) = splitAt 1 sortedAccs
         (restAccs, maxAcc:[]) = splitAt (length restMaxAccs - 1) restMaxAccs
 
+data BillsCliFlag = FlagHelp | FlagVersion | FlagAllowPlaceholder | FlagAllowUnterminated deriving Eq
+billsCliFlags = [
+    Option ['h'] ["help"] (NoArg FlagHelp) "Show help message",
+    Option ['v'] ["version"] (NoArg FlagVersion) "Show version information",
+    Option ['P'] ["allow-placeholder"] (NoArg FlagAllowPlaceholder) "Allow placeholders (as if they weren't there)",
+    Option ['T'] ["allow-unterminated"] (NoArg FlagAllowUnterminated) "Allow unterminated input"
+    ]
+
+billsCliParse argv = case getOpt Permute billsCliFlags argv of
+    (flags, filenames, []) -> do
+        let filenames' = if null filenames then ["-"] else filenames
+        if FlagHelp `elem` flags then do
+            hPutStrLn stderr $ usageInfo billsCliUsage billsCliFlags
+            exitWith ExitSuccess
+        else if FlagVersion `elem` flags then do
+            hPutStrLn stderr billsCliVersion
+            exitWith ExitSuccess
+        else do
+            let ps = initParserState {
+                psAllowUnterminated=FlagAllowUnterminated `elem` flags,
+                psAllowPlaceholder=FlagAllowPlaceholder `elem` flags
+            }
+            return (ps, filenames')
+    (_, _, errs) -> do
+        hPutStrLn stderr $ concat errs ++ usageInfo billsCliUsage billsCliFlags
+        exitWith $ ExitFailure 1
+    where
+        billsCliUsage = "Usage: bills [--help] [--version] [--allow-placeholder] [--allow-unterminated] [files...]"
+        billsCliVersion = "Bills " ++ kVERSION ++ ", (c) 2015-2019 tobyp <tobyp@tobyp.net>"
+
+getFileContents "-" = getContents
+getFileContents filename = readFile filename
+
+parseBill parserState filename = do
+    content <- getFileContents filename
+    case runParser bills parserState filename content of
+        Left err -> do
+            hPutStrLn stderr "Parsing failed:"
+            hPutStrLn stderr $ show err
+            exitWith $ ExitFailure 1
+        Right transactions -> do
+            return transactions
+
 main :: IO ()
 main = do
-    content <- getContents
-    case runParser bills initParserState "<input>" content of
-        Left err -> do
-            putStrLn "Parsing Failed."
-            print err
-        Right transactions -> do
-            collapseAccounts $ foldl applyTransaction [] transactions
+    (parserState, filenames) <- getArgs >>= billsCliParse
+    let bills = parseBill parserState <$> filenames
+    transactions <- concat <$> sequence bills
+    collapseAccounts $ foldl applyTransaction [] transactions
+    exitWith $ ExitSuccess

@@ -1,5 +1,6 @@
-A	X	1.00
+#!./bills
+A	X.	1.00
 
 %define X A(2B3C)4(D(E))
 
-A	2X3(BCDE)	300.00
+A	2X3(BCDE).	300.00

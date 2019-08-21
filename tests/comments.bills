@@ -1,11 +1,12 @@
+#!./bills
 # This is a Comment
 
 # So is the next line
 #A	B	1.0
 
 # But not this one
-C	D	1.0	# except from here on out
+C	D.	1.0	# except from here on out
 
-E F 5#direct comment
+E F. 5#direct comment
 
      # whitespace comment     

@@ -1,5 +1,6 @@
-A	X	1.0
+#!./bills
+A	X.	1.0
 
 %define X Y2Z
 
-A	X	3.0
+A	X.	3.0

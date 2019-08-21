@@ -1,5 +1,5 @@
 pkgname=bills
-pkgver=1.0
+pkgver=0
 pkgrel=1
 pkgdesc="Bills "
 arch=('any')
@@ -8,6 +8,10 @@ depends=('gmp' 'libffi')
 makedepends=('ghc-static')
 source=("git+https://git.tobyp.net/tobyp/bills-hs.git")
 sha512sums=('SKIP')
+
+pkgver() {
+	sed -n 's/kVERSION\s*=\s*"\([^"]\+\)"/\1/p' "${srcdir}/bills-hs/bills.hs"
+}
 
 build() {
 	cd "bills-hs"
