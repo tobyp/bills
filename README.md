@@ -18,7 +18,7 @@ Sometimes, multiple people spend money, and/or the money is spent for multiple p
 For this, shares can be specified.
 A share is either:
  - A person (e.g. `A` or `Bob`, starting with exactly one uppercase letter and continuing with any number of lowercase letters)
- - A group of people (optinally weighted, optionally comma separated) (e.g. `AB`, `Alice,Bob`)
+ - A group of people (optinally weighted, optionally comma separated) (e.g. `AB`, `A,B`, `AliceBob`, `Alice,Bob`)
 
 Groups can be weighted to by parenthesizing them: `1(AB)2(BC)`. The amount will first be distributed to groups according to group weight, and then inside the groups according to the weights inside the parentheses.
 
@@ -32,6 +32,14 @@ Some examples:
  - `3(1A,2B)(DE)`: quarter for A, half for B, and eight for D and E each
  - `7(3(AB)5(3D7E))(8F1(3G1H))`  you're insane
 
+### Defines
+
+The `%define` and `%undefine` syntax can be used to re-define person names.
+This has two main uses (though other, more creative uses, are of course possible):
+ - Creating "groups" by defining a new Person, e.g. `%define E ABCD` and then using the shorthand `E` for items shared equally by those four parties. Groups can be any weighted expression, as described above.
+ - Having others pay for a specific person's expenses, e.g. `%define X AB` for `A` and `B` to share all expenses `X` incurs. This is nice when you want to "treat" someone to something, and foot their bill.
+
+Defines will remain in effect until they are removed by an `%undefine` line, and are applied both for creditors and debitors.
 ## Building
 
 ```
