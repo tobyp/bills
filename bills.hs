@@ -2,6 +2,7 @@ import Text.Parsec
 import Text.Printf
 import Data.Ratio
 import Data.Maybe
+import Data.Functor.Identity
 import qualified Data.Map.Strict as M
 import GHC.Exts
 import System.Console.GetOpt
@@ -21,18 +22,24 @@ data Transaction = Transaction Person Money deriving Show
 
 data ParserState = ParserState {
     psDefineMap :: M.Map Person [Share],
+    psCurrencyMap :: M.Map String Money,
+    psCurrentCurrency :: String,
     psAllowPlaceholder :: Bool,
     psAllowUnterminated :: Bool
 }
 initParserState :: ParserState
 initParserState = ParserState {
     psDefineMap=M.empty,
+    psCurrencyMap=M.singleton "XXX" 1,
+    psCurrentCurrency="XXX",
     psAllowPlaceholder=False,
     psAllowUnterminated=False
 }
 
 psDefine p s ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.insert p s m}
 psUndefine p ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.delete p m}
+psDefineCurrency c v ps@(ParserState{psCurrencyMap=m}) = ps {psCurrencyMap=M.insert c v m}
+psSetCurrentCurrency c ps = ps {psCurrentCurrency=c}
 
 mkShares :: ParserState -> Person -> [Share]
 mkShares m p = M.findWithDefault [Share p 1] p (psDefineMap m)
@@ -53,6 +60,9 @@ person = do
     b <- many small
     return (a:b)
 
+-- String
+currencyCode = count 3 large
+
 -- Ratio Integer
 number = do
     sign <- option (1) ((char '-') >> (return (-1 % 1)))
@@ -62,6 +72,17 @@ number = do
         fracpart <- many1 digit;
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
+
+-- Money == Ratio Integer
+money = do
+    value <- number
+    ps@(ParserState{psCurrencyMap=currencyMap, psCurrentCurrency=currentCurrency}) <- getState
+    cc <- option currentCurrency $ try $ do {
+        skipMany whitespace;
+        currencyCode }
+    case M.lookup cc currencyMap of
+        Nothing -> fail "No such currency"
+        Just currency -> return $ value * currency
 
 -- [Share]
 share_person = do
@@ -103,22 +124,7 @@ comment = do
     char '#'
     many $ noneOf "\n"
 
--- [Transaction]
-entry = do
-    creditors <- shareDifference
-    many1 space
-    debtors <- shareDifference
-    terminated <- optionMaybe (char '.')
-    state <- getState
-    case (terminated, psAllowUnterminated state) of
-        (Nothing, False) ->
-            fail "Unterminated entry (entries without a . at the end are not allowed)"
-        _ -> do
-            many1 space
-            amount <- number
-            return $ shareTransaction creditors amount debtors
-
--- Maybe [Transaction]
+--  [Transaction]
 line_define = do
     string "%define"
     skipMany whitespace
@@ -128,9 +134,9 @@ line_define = do
     skipMany whitespace
     optional comment
     modifyState $ psDefine token $ normalizeShares shares
-    return Nothing
+    return []
 
--- Maybe [Transaction]
+--  [Transaction]
 line_undefine = do
     string "%undefine"
     skipMany whitespace
@@ -138,18 +144,57 @@ line_undefine = do
     skipMany whitespace
     optional comment
     modifyState $ psUndefine token
-    return Nothing
+    return []
 
--- Maybe [Transaction]
-line_entry = do
+-- [Transaction]
+line_exchange = do
+    string "%exchange"
     skipMany whitespace
-    e <- optionMaybe entry
+    cc <- currencyCode
+    skipMany whitespace
+    value <- number
     skipMany whitespace
     optional comment
-    return e
+    modifyState $ psDefineCurrency cc value
+    return []
 
--- Maybe [Transaction]
-line = try line_define <|> try line_undefine <|> line_entry
+-- [Transaction]
+line_currency = do
+    string "%currency"
+    skipMany whitespace
+    cc <- currencyCode
+    skipMany whitespace
+    optional comment
+    modifyState $ psSetCurrentCurrency cc
+    return []
+
+-- [Transaction]
+line_entry = do
+    skipMany whitespace
+    creditors <- shareDifference
+    many1 space
+    debtors <- shareDifference
+    terminated <- optionMaybe (char '.')
+    state <- getState
+    transactions <- case (terminated, psAllowUnterminated state) of
+        (Nothing, False) ->
+            fail "Unterminated entry (entries without a . at the end are not allowed)"
+        _ -> do
+            skipMany space
+            amount <- money
+            return $ shareTransaction creditors amount debtors
+    skipMany whitespace
+    optional comment
+    return transactions
+
+-- [Transaction]
+line_empty = do
+    skipMany whitespace
+    optional comment
+    return []
+
+-- [Transaction]
+line = try line_define <|> try line_undefine <|> try line_exchange <|> try line_currency <|> try line_entry <|> line_empty
 
 eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 
@@ -157,7 +202,7 @@ eol = (try $ string "\n\r") <|> (try $ string "\r\n") <|> (try $ string "\n")
 bills = do
     lines <- sepEndBy line eol
     eof
-    return $ concat $ catMaybes lines
+    return $ concat lines
 
 scaleShare :: Weight -> Share -> Share
 scaleShare scalar (Share p w) = Share p (w / scalar)

@@ -1,0 +1,14 @@
+#!./bills
+
+%exchange XTS 2.0  # XTS is the test currency code
+
+A	B.	4.00
+
+%currency XTS
+A	B.	2.00
+
+%currency XXX
+A	B.	4.00
+
+%currency XTS
+A	B.	2.00
