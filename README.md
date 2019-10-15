@@ -41,6 +41,17 @@ This has two main uses (though other, more creative uses, are of course possible
 
 Defines will remain in effect until they are removed by an `%undefine` line, and are applied both for creditors and debitors.
 
+### Currencies
+
+Amounts of money can be specified with an optional currency (without a currency code, the active currency is assumed, which defaults to the standin currency code `XXX`).
+New currencies can be defined using the command `%exchange ABC 1.23`, which defines that one unit of the currency ABC (`1.00 ABC`) is worth 1.23 units of the default currency (`1.23 XXX`).
+An amount specified as `567.89 ABC` will therefore be converted to `698.5047 XXX`.
+
+When no currency is specified, the active currency is used, which defaults to `XXX`.
+The default currency can be changed to ABC by the `%currency ABC` directive.
+
+If working with the `XXX` currency confuses you, add a `%exchange ABC 1.00` directive to make ABC be exactly equivalent to XXX and then think of that as your default currency.
+
 ### Exclusions
 
 With group-style defines, especially with large groups, it may be convenient to exclude certain members of the group for specific entries, without having to redefine the entire (possible complex) group structure.

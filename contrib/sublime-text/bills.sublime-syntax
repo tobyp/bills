@@ -7,7 +7,8 @@ file_extensions: ["bills"]
 first_line_match: "#!/usr/bin/env bills"
 
 variables:
-  person: "[A-Z][_a-z]*"
+  person: "[A-Z*][_a-z]*"
+  currency: "[A-Z]{3}"
   number: "-?\\d+([.,]\\d+)?"
   whitespace: "[ \t\v]"
 
@@ -24,54 +25,64 @@ contexts:
         1: punctuation.definition.comment
 
   directive:
-    - match: "(?=%define)"
-      push: directive_define
-    - match: "(?=%undefine)"
-      push: directive_undefine
-
-  directive_define:
     - match: "%define"
       scope: keyword.control.define
-    - match: "{{whitespace}}+"
-      set: directive_define_macro
-
-  directive_define_macro:
-    - match: "{{person}}"
-      scope: markup.person
-    - match: "{{whitespace}}+"
-      set: directive_define_definition
-
-  directive_define_definition:
-    - match: "(?=[A-Z]|[-0-9]|[(])"
-      push: common_share
-    - match: "{{whitespace}}+"
-      set: main
-
-  directive_undefine:
+      push: define_person
     - match: "%undefine"
       scope: keyword.control.undefine
-    - match: "{{whitespace}}+"
-      set: directive_undefine_macro
+      push: undefine_person
+    - match: "%exchange"
+      scope: keyword.control.exchange
+      push: exchange_currency
+    - match: "%currency"
+      scope: keyword.control.currency
+      push: currency_currency
 
-  directive_undefine_macro:
+  define_person:
     - match: "{{person}}"
       scope: markup.person
-    - match: "{{whitespace}}+"
-      set: main
+      set: define_definition
+
+  define_definition:
+    - include: creditor_share
+    - include: comment
+    - match: "$"
+      pop: true
+
+  undefine_person:
+    - match: "{{person}}"
+      scope: markup.person
+    - include: comment
+    - match: "$"
+      pop: true
+
+  exchange_currency:
+    - match: "{{currency}}"
+      scope: storage.type.currency
+      set: exchange_rate
+
+  exchange_rate:
+    - match: "{{number}}"
+      scope: constant.number.exchange_rate
+    - include: comment
+    - match: "$"
+      pop: true
+
+  currency_currency:
+    - match: "{{currency}}"
+      scope: storage.type.currency
+    - include: comment
+    - match: "$"
+      pop: true
 
   entry:
-    - match: "(?=[A-Z]|[-0-9]|[(])"
-      set: entry_creditor
-  
-  entry_creditor:
-    - match: "(?=[A-Z]|[-0-9]|[(])"
-      push: creditor_share
+    - meta_scope: entity.entry
+    - include: creditor_share
     - match: "{{whitespace}}+"
       set: entry_debitor
 
   entry_debitor:
-    - match: "(?=[A-Z]|[-0-9]|[(])"
-      push: debitor_share
+    - include: debitor_share
     - match: \.
       scope: markup.bold
     - match: "{{whitespace}}+"
@@ -80,15 +91,14 @@ contexts:
   entry_amount:
     - match: "{{number}}"
       scope: constant.numeric.amount
-    - match: "{{whitespace}}+"
+    - match: "{{currency}}"
+      scope: storage.type.currency
+    - include: "comment"
+    - match: "$"
       set: main
 
   creditor_share:
     - meta_scope: markup.inserted.creditor
-    - include: share
-
-  common_share:
-    - meta_scope: markup.share
     - include: share
 
   debitor_share:
@@ -107,10 +117,6 @@ contexts:
       push: group_share
     - match: "\\?"
       scope: invalid.illegal
-    - match: (?=\.)
-      pop: true
-    - match: "(?={{whitespace}})"
-      pop: true
 
   group_share:
     - match: \)
