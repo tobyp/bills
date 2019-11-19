@@ -1,0 +1,2 @@
+# this should not be parsed, because it is confusing to tell that Foo is the macro and BarBaz the value
+%defineFooBarBaz

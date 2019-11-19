@@ -7,10 +7,10 @@ file_extensions: ["bills"]
 first_line_match: "#!/usr/bin/env bills"
 
 variables:
-  person: "[A-Z*][_a-z]*"
-  currency: "[A-Z]{3}"
-  number: "-?\\d+([.,]\\d+)?"
-  whitespace: "[ \t\v]"
+  person: '[A-Z*][_a-z]*'
+  currency: '[A-Z]{3}'
+  number: '-?\d+([.,]\d+)?'
+  whitespace: '[ \t\v]'
 
 contexts:
   main:

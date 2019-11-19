@@ -51,7 +51,9 @@ sharesExclude included excluded = normalizeShares [s | s@(Share p _) <- included
 
 large = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 small = oneOf "_abcdefghijklmnopqrstuvwxyz"
-whitespace = oneOf " \t\v"
+whitechar = oneOf " \t\v"
+whitespace = many1 whitechar >> return ()
+optWhitespace = many whitechar >> return ()
 decimalSeparator = oneOf ".,"
 
 -- String
@@ -78,7 +80,7 @@ money = do
     value <- number
     ps@(ParserState{psCurrencyMap=currencyMap, psCurrentCurrency=currentCurrency}) <- getState
     cc <- option currentCurrency $ try $ do {
-        skipMany whitespace;
+        optWhitespace;
         currencyCode }
     case M.lookup cc currencyMap of
         Nothing -> fail "No such currency"
@@ -127,11 +129,11 @@ comment = do
 --  [Transaction]
 line_define = do
     string "%define"
-    skipMany whitespace
+    whitespace
     token <- person
-    skipMany whitespace
+    whitespace
     shares <- shareDifference
-    skipMany whitespace
+    optWhitespace
     optional comment
     modifyState $ psDefine token $ normalizeShares shares
     return []
@@ -139,9 +141,9 @@ line_define = do
 --  [Transaction]
 line_undefine = do
     string "%undefine"
-    skipMany whitespace
+    whitespace
     token <- person
-    skipMany whitespace
+    optWhitespace
     optional comment
     modifyState $ psUndefine token
     return []
@@ -149,11 +151,11 @@ line_undefine = do
 -- [Transaction]
 line_exchange = do
     string "%exchange"
-    skipMany whitespace
+    whitespace
     cc <- currencyCode
-    skipMany whitespace
+    whitespace
     value <- number
-    skipMany whitespace
+    optWhitespace
     optional comment
     modifyState $ psDefineCurrency cc value
     return []
@@ -161,16 +163,16 @@ line_exchange = do
 -- [Transaction]
 line_currency = do
     string "%currency"
-    skipMany whitespace
+    whitespace
     cc <- currencyCode
-    skipMany whitespace
+    optWhitespace
     optional comment
     modifyState $ psSetCurrentCurrency cc
     return []
 
 -- [Transaction]
 line_entry = do
-    skipMany whitespace
+    optWhitespace
     creditors <- shareDifference
     many1 space
     debtors <- shareDifference
@@ -183,13 +185,13 @@ line_entry = do
             skipMany space
             amount <- money
             return $ shareTransaction creditors amount debtors
-    skipMany whitespace
+    optWhitespace
     optional comment
     return transactions
 
 -- [Transaction]
 line_empty = do
-    skipMany whitespace
+    optWhitespace
     optional comment
     return []
 
