@@ -25,7 +25,8 @@ data ParserState = ParserState {
     psCurrencyMap :: M.Map String Money,
     psCurrentCurrency :: String,
     psAllowPlaceholder :: Bool,
-    psAllowUnterminated :: Bool
+    psAllowUnterminated :: Bool,
+    psShowFlows :: Bool
 }
 initParserState :: ParserState
 initParserState = ParserState {
@@ -33,7 +34,8 @@ initParserState = ParserState {
     psCurrencyMap=M.singleton "XXX" 1,
     psCurrentCurrency="XXX",
     psAllowPlaceholder=False,
-    psAllowUnterminated=False
+    psAllowUnterminated=False,
+    psShowFlows=False
 }
 
 psDefine p s ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.insert p s m}
@@ -265,13 +267,23 @@ applyTransaction (a@(Account ap am):as) t@(Transaction p m)
 collapseAccounts :: [Account] -> IO ()
 collapseAccounts [] = return ()
 collapseAccounts accs = do
-    printf "%s pays %f to %s\n" debitor (((fromRational baseline) :: Float)) creditor
+    printf "todo: %s pays %f to %s\n" debitor (((fromRational baseline) :: Float)) creditor
     collapseAccounts $ filter accountNotEmpty $ modifiedAccounts
         where
             accountNotEmpty (Account _ m) = m /= 0
             modifiedAccounts = (Account creditor (credit + baseline)):(Account debitor (debit - baseline)):otherAccs
             baseline = min (-credit) debit
             ((Account creditor credit), (Account debitor debit), otherAccs) = minMaxAccounts accs
+
+-- total inflow and outflow of every person's wallet
+totalFlow :: [Transaction] -> [(Person, Money, Money)]
+totalFlow ts = flatten <$> (M.assocs $ go M.empty ts)
+    where
+        go m_ [] = m_
+        go m_ ((Transaction p m):ts) = go (M.alter (recordFlow m) p m_) ts
+        recordFlow m Nothing = Just $ if m < 0 then (-m, 0) else (0, m)
+        recordFlow m (Just (mi, mo)) = Just $ if m < 0 then (mi - m, mo) else (mi, mo + m)
+        flatten (p, (mi, mo)) = (p, mi, mo)
 
 -- separate out the biggest creditor and debitor from an account list (of length >= 2!)
 minMaxAccounts :: [Account] -> (Account, Account, [Account])
@@ -283,12 +295,14 @@ minMaxAccounts accs = (minAcc, maxAcc, restAccs)
         (minAcc:[], restMaxAccs) = splitAt 1 sortedAccs
         (restAccs, maxAcc:[]) = splitAt (length restMaxAccs - 1) restMaxAccs
 
-data BillsCliFlag = FlagHelp | FlagVersion | FlagAllowPlaceholder | FlagAllowUnterminated deriving Eq
+
+data BillsCliFlag = FlagHelp | FlagVersion | FlagAllowPlaceholder | FlagAllowUnterminated | FlagShowFlows deriving Eq
 billsCliFlags = [
     Option ['h'] ["help"] (NoArg FlagHelp) "Show help message",
     Option ['v'] ["version"] (NoArg FlagVersion) "Show version information",
     Option ['P'] ["allow-placeholder"] (NoArg FlagAllowPlaceholder) "Allow placeholders (as if they weren't there)",
-    Option ['T'] ["allow-unterminated"] (NoArg FlagAllowUnterminated) "Allow unterminated input"
+    Option ['T'] ["allow-unterminated"] (NoArg FlagAllowUnterminated) "Allow unterminated input",
+    Option ['F'] ["show-flows"] (NoArg FlagShowFlows) "Show total flows per person"
     ]
 
 billsCliParse argv = case getOpt Permute billsCliFlags argv of
@@ -303,7 +317,8 @@ billsCliParse argv = case getOpt Permute billsCliFlags argv of
         else do
             let ps = initParserState {
                 psAllowUnterminated=FlagAllowUnterminated `elem` flags,
-                psAllowPlaceholder=FlagAllowPlaceholder `elem` flags
+                psAllowPlaceholder=FlagAllowPlaceholder `elem` flags,
+                psShowFlows=FlagShowFlows `elem` flags
             }
             return (ps, filenames')
     (_, _, errs) -> do
@@ -311,7 +326,7 @@ billsCliParse argv = case getOpt Permute billsCliFlags argv of
         exitWith $ ExitFailure 1
     where
         billsCliUsage = "Usage: bills [--help] [--version] [--allow-placeholder] [--allow-unterminated] [files...]"
-        billsCliVersion = "Bills " ++ kVERSION ++ ", (c) 2015-2019 tobyp <tobyp@tobyp.net>"
+        billsCliVersion = "Bills " ++ kVERSION ++ ", (c) 2015-2020 tobyp <tobyp@tobyp.net>"
 
 getFileContents "-" = getContents
 getFileContents filename = readFile filename
@@ -326,10 +341,16 @@ parseBill parserState filename = do
         Right transactions -> do
             return transactions
 
+printFlow :: (Person, Money, Money) -> IO ()
+printFlow (p, m1, m2) = printf "flow: %s spent a total of %f and received a total of %f\n" p ((fromRational m1) :: Float) ((fromRational m2) :: Float)
+
 main :: IO ()
 main = do
     (parserState, filenames) <- getArgs >>= billsCliParse
     let bills = parseBill parserState <$> filenames
     transactions <- concat <$> sequence bills
+    if psShowFlows parserState then do {
+        sequence $ printFlow <$> totalFlow transactions
+    } else return [()]
     collapseAccounts $ foldl applyTransaction [] transactions
     exitWith $ ExitSuccess
