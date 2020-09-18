@@ -12,8 +12,11 @@ else
 	RESET=''
 fi
 
+test_inputs=("$1/"*".bills");
+#test_inputs=("tests/regression-syntax-spaceless-define-FAIL.bills")
+
 result=0
-for test_input in "$1/"*".bills"; do
+for test_input in "${test_inputs[@]}"; do
 	test_input_base="$(basename ${test_input})";
 	test_name="${test_input_base%.*}";
 	test_output="$1/${test_name}.output";
@@ -31,12 +34,14 @@ for test_input in "$1/"*".bills"; do
 
 	echo "Running test \"${test_name}\"...";
 	if [ -e "${test_output}" ]; then
-		${test_cmd} 2>/dev/null | diff -d - "${test_output}";
-		test_result=${PIPESTATUS[0]};
-		diff_result=$?;
+		${test_cmd} 2>/dev/null | sort | diff -d - "${test_output}";
+		pipestatus=("${PIPESTATUS[@]}")
+		test_result=${pipestatus[0]};
+		diff_result=${pipestatus[2]};
 	else
 		${test_cmd} 2>/dev/null
-		test_result=${PIPESTATUS[0]};
+		pipestatus=("${PIPESTATUS[@]}")
+		test_result=${pipestatus[0]};
 		diff_result=0;
 	fi
 
