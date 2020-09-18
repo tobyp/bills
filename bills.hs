@@ -10,7 +10,7 @@ import System.Environment
 import System.Exit
 import System.IO
 
-kVERSION = "2.0.0"
+kVERSION = "2.0.1"
 
 type Person = String
 type Money = Ratio Integer
