@@ -76,7 +76,13 @@ number = do
     return $ (read intpart) % 1 + fracpart
 
 -- Money == Ratio Integer
-money = do
+operatorFunc '+' = (+)
+operatorFunc '-' = (-)
+operatorFunc '*' = (*)
+operatorFunc '/' = (/)
+operatorFunc _ = const  -- lalala
+
+expr_term = do
     value <- number
     ps@(ParserState{psCurrencyMap=currencyMap, psCurrentCurrency=currentCurrency}) <- getState
     cc <- option currentCurrency $ try $ do {
@@ -85,6 +91,28 @@ money = do
     case M.lookup cc currencyMap of
         Nothing -> fail "No such currency"
         Just currency -> return $ value * currency
+
+expr_prod = do
+    lhs <- expr_term
+    rhs <- many $ try $ do
+        optWhitespace
+        op <- oneOf "*/"
+        optWhitespace
+        t <- expr_term
+        return ((operatorFunc op), t)
+    return $ foldl (\l (o, r) -> o l r) lhs rhs
+
+expr_sum = do
+    lhs <- expr_prod
+    rhs <- many $ try $ do
+        optWhitespace
+        op <- oneOf "+-"
+        optWhitespace
+        t <- expr_prod
+        return ((operatorFunc op), t)
+    return $ foldl (\l (o, r) -> o l r) lhs rhs
+
+money = expr_sum
 
 -- [Share]
 share_person = do
