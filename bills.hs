@@ -10,11 +10,11 @@ import System.Environment
 import System.Exit
 import System.IO
 
-kVERSION = "2.0.1"
+kVERSION = "2.0.2"
 
 type Person = String
-type Money = Ratio Integer
 type Weight = Ratio Integer
+type Money = Ratio Integer
 
 data Share = Share Person Weight deriving Show
 data Account = Account Person Money deriving Show
@@ -22,8 +22,7 @@ data Transaction = Transaction Person Money deriving Show
 
 data ParserState = ParserState {
     psDefineMap :: M.Map Person [Share],
-    psCurrencyMap :: M.Map String Money,
-    psCurrentCurrency :: String,
+    psVariables :: M.Map String Money,
     psAllowPlaceholder :: Bool,
     psAllowUnterminated :: Bool,
     psShowFlows :: Bool
@@ -31,17 +30,17 @@ data ParserState = ParserState {
 initParserState :: ParserState
 initParserState = ParserState {
     psDefineMap=M.empty,
-    psCurrencyMap=M.singleton "XXX" 1,
-    psCurrentCurrency="XXX",
+    psVariables=M.empty,
     psAllowPlaceholder=False,
     psAllowUnterminated=False,
     psShowFlows=False
 }
 
-psDefine p s ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.insert p s m}
-psUndefine p ps@(ParserState{psDefineMap=m}) = ps {psDefineMap=M.delete p m}
-psDefineCurrency c v ps@(ParserState{psCurrencyMap=m}) = ps {psCurrencyMap=M.insert c v m}
-psSetCurrentCurrency c ps = ps {psCurrentCurrency=c}
+psDefine name shares ps@(ParserState{psDefineMap=defs}) = ps {psDefineMap=M.insert name shares defs}
+psUndefine name ps@(ParserState{psDefineMap=defs}) = ps {psDefineMap=M.delete name defs}
+psSet name value ps@(ParserState{psVariables=vars}) = ps {psVariables=M.insert name value vars}
+psUnset name ps@(ParserState{psVariables=vars}) = ps {psVariables=M.delete name vars}
+psGet name ps@(ParserState{psVariables=vars}) = M.lookup name vars
 
 mkShares :: ParserState -> Person -> [Share]
 mkShares m p = M.findWithDefault [Share p 1] p (psDefineMap m)
@@ -53,6 +52,8 @@ sharesExclude included excluded = normalizeShares [s | s@(Share p _) <- included
 
 large = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 small = oneOf "_abcdefghijklmnopqrstuvwxyz"
+varStart = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
+varFollow = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789'"
 whitechar = oneOf " \t\v"
 whitespace = many1 whitechar >> return ()
 optWhitespace = many whitechar >> return ()
@@ -84,15 +85,19 @@ operatorFunc '*' = (*)
 operatorFunc '/' = (/)
 operatorFunc _ = const  -- lalala
 
-expr_term = do
-    value <- number
-    ps@(ParserState{psCurrencyMap=currencyMap, psCurrentCurrency=currentCurrency}) <- getState
-    cc <- option currentCurrency $ try $ do {
-        optWhitespace;
-        currencyCode }
-    case M.lookup cc currencyMap of
-        Nothing -> fail "No such currency"
-        Just currency -> return $ value * currency
+variableName = do
+    head <- varStart
+    tail <- many varFollow
+    return $ head:tail
+
+variable = do
+    name <- variableName
+    ps <- getState
+    case psGet name ps of
+        Nothing -> fail "No such variable"
+        Just value -> return value
+
+expr_term = try number <|> variable
 
 expr_prod = do
     lhs <- expr_term
@@ -180,24 +185,24 @@ line_undefine = do
 
 -- [Transaction]
 line_exchange = do
-    string "%exchange"
+    string "%set"
     whitespace
-    cc <- currencyCode
+    var <- variableName
     whitespace
     value <- number
     optWhitespace
     optional comment
-    modifyState $ psDefineCurrency cc value
+    modifyState $ psSet var value
     return []
 
 -- [Transaction]
 line_currency = do
-    string "%currency"
+    string "%unset"
     whitespace
-    cc <- currencyCode
+    var <- variableName
     optWhitespace
     optional comment
-    modifyState $ psSetCurrentCurrency cc
+    modifyState $ psUnset var
     return []
 
 -- [Transaction]
@@ -342,7 +347,12 @@ parseBill parserState filename = do
             return transactions
 
 printFlow :: (Person, Money, Money) -> IO ()
-printFlow (p, m1, m2) = printf "flow: %s spent a total of %f and received a total of %f\n" p ((fromRational m1) :: Float) ((fromRational m2) :: Float)
+printFlow (p, m1, m2) = printf "flow: %s consumed %f and %s %f (so, is out %f)\n" p consumed relation (abs diff) isout
+    where
+        consumed = (fromRational m2) :: Float
+        isout = (fromRational m1) :: Float
+        diff = (fromRational (m1 - m2)) :: Float
+        relation = if diff > 0 then "is owed" else "owes"
 
 main :: IO ()
 main = do

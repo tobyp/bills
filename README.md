@@ -32,6 +32,13 @@ Some examples:
  - `3(1A,2B)(DE)`: quarter for A, half for B, and eight for D and E each
  - `7(3(AB)5(3D7E))(8F1(3G1H))`  you're insane
 
+### Exclusions
+
+With group-style defines, especially with large groups, it may be convenient to exclude certain members of the group for specific entries, without having to redefine the entire (possible complex) group structure.
+This can be achieved with exclusion syntax, e.g. `ABCD\A`, which is equivalent to `ABC`.
+The `\\` operator binds less tightly than union, but respects parentheses, e.g. `(AB)C\D` is the same as `ABC\D`, and `ABC\(AB\A)` equals `AC`.
+Exclusion disregards weights, and will remove all shares on the left side for any person on the right side, e.g. `5A3B2C6D\1A2B` is equal to `2C6D`.
+
 ### Defines
 
 The `%define` and `%undefine` syntax can be used to re-define person names.
@@ -41,23 +48,18 @@ This has two main uses (though other, more creative uses, are of course possible
 
 Defines will remain in effect until they are removed by an `%undefine` line, and are applied both for creditors and debitors.
 
+### Variables
+
+Similar to defines providing shorthands for people/group shares, variables can be used as shorthands for money values.
+They can be created and modified using the `%set` directive, and removed with `%unset`.
+Variable names may begin with any letter or and underscore, and may continue with any letter, underscore, or digit.
+If a variable is not set (or was unset), using it is an error.
+
 ### Currencies
 
-Amounts of money can be specified with an optional currency (without a currency code, the active currency is assumed, which defaults to the standin currency code `XXX`).
-New currencies can be defined using the command `%exchange ABC 1.23`, which defines that one unit of the currency ABC (`1.00 ABC`) is worth 1.23 units of the default currency (`1.23 XXX`).
-An amount specified as `567.89 ABC` will therefore be converted to `698.5047 XXX`.
-
-When no currency is specified, the active currency is used, which defaults to `XXX`.
-The default currency can be changed to ABC by the `%currency ABC` directive.
-
-If working with the `XXX` currency confuses you, add a `%exchange ABC 1.00` directive to make ABC be exactly equivalent to XXX and then think of that as your default currency.
-
-### Exclusions
-
-With group-style defines, especially with large groups, it may be convenient to exclude certain members of the group for specific entries, without having to redefine the entire (possible complex) group structure.
-This can be achieved with exclusion syntax, e.g. `ABCD\A`, which is equivalent to `ABC`.
-The `\\` operator binds less tightly than union, but respects parentheses, e.g. `(AB)C\D` is the same as `ABC\D`, and `ABC\(AB\A)` equals `AC`.
-Exclusion disregards weights, and will remove all shares on the left side for any person on the right side, e.g. `5A3B2C6D\1A2B` is equal to `2C6D`.
+To work with multiple currencies, it is suggested to define variables for their currency symbols, and set them to the cost of that currency in the implicit "base" currency.
+For example, when usually working in a "base currency" of EUR, one might create a variable `GBP` and set it to `1.09`, i.e. one GBP costs 1.09 EUR.
+Then an item that cost 5 GBP would be entered as costing `5*GBP`.
 
 ## Building
 
@@ -102,9 +104,26 @@ A,B		AB,2C		# A and B each paid half of the tickets, which included one for each
 ### Output
 
 ```
-C pays 16.166666 to A
-C pays 1.2866666 to B
+todo: C pays 16.166666 to A
+todo: C pays 1.2866666 to B
 ```
+
+### Additional Options
+
+Additionally to the "todos" that describe how to balance wallets after a set of transactions, `bills` can also calculate flows, which show for each user how much they have spent/received.
+To do this, specify the `-F` option, and receive the following output (in addition to the todos, which are not repeated here):
+
+```
+flow: A consumed 22.833334 and is owed 16.166666 (so, is out 39.0)
+flow: B consumed 25.713333 and is owed 1.2866666 (so, is out 27.0)
+flow: C consumed 26.333334 and owes 17.453333 (so, is out 8.88)
+```
+
+As an explanation:
+
+- "consumed" is usually to be interpreted as "goods in the value of".
+- "is out" means from your wallet, and includes the money that was spent on behalf of someone else.
+- "owes"/"is owed" shows whether you need to give or receive money in order to "square" with everyone else.
 
 ## Wishlist
 

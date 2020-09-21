@@ -1,18 +1,14 @@
 #!./bills
 
-%exchange XTS 2.0  # XTS is the test currency code
-%exchange XTT 4.0
+%set XTS 2.0  # XTS is the test currency code
+%set XTT 4.0
 
 A	B.	4.00
 
-%currency XTS
-A	B.	2.00
+A	B.	2.00*XTS
 
-%currency XTT
-A	B.	1.00
+A	B.	1.00*XTT
 
-%currency XTS
-A	B.	2.00
+A	B.	2.00*XTS
 
-%currency XXX
 A	B.	4.00
