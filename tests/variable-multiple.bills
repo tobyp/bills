@@ -1,0 +1,4 @@
+#!./bills
+%set x 2
+%set y 3
+A	B.	5*x + y

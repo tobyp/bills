@@ -1,0 +1,3 @@
+#!./bills
+%set x 1
+A	B.	2*x

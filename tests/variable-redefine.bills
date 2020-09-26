@@ -1,0 +1,6 @@
+#!./bills
+%set x 2
+A	B.	5*x
+
+%set x 5
+B	A.	2*x

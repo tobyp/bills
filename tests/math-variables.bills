@@ -1,0 +1,5 @@
+#!./bills
+%set x 5
+%set y 7
+%set z 11
+A	B.	x+y*2+z/3

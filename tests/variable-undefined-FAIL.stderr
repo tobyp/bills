@@ -1,0 +1,5 @@
+Parsing failed:
+"tests/variable-undefined-FAIL.bills" (line 2, column 20):
+unexpected "\n"
+expecting "*", "/" or operator
+No such variable "x"
