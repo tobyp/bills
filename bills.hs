@@ -1,4 +1,5 @@
 import Text.Parsec
+import Text.Parsec.Expr
 import Text.Printf
 import Data.Ratio
 import Data.Maybe
@@ -50,8 +51,8 @@ sharesExclude included excluded = normalizeShares [s | s@(Share p _) <- included
     where
         excludedPersons = [p | (Share p _) <- excluded]
 
-large = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-small = oneOf "_abcdefghijklmnopqrstuvwxyz"
+nameStart = oneOf "*ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+nameFollow = oneOf "_abcdefghijklmnopqrstuvwxyz"
 varStart = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
 varFollow = oneOf "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789'"
 whitechar = oneOf " \t\v"
@@ -61,12 +62,9 @@ decimalSeparator = oneOf ".,"
 
 -- String
 person = do
-    a <- large
-    b <- many small
-    return (a:b)
-
--- String
-currencyCode = count 3 large
+    head <- nameStart
+    tail <- many nameFollow
+    return $ head:tail
 
 -- Ratio Integer
 number = do
@@ -77,61 +75,80 @@ number = do
         return $ (read fracpart) % (10 ^ (length fracpart)) }
     return $ (read intpart) % 1 + fracpart
 
+
+data Expr a
+    = ExprLit a
+    | ExprVar String
+    | ExprUnOp (a -> a) (Expr a)
+    | ExprBinOp (a -> a -> a) (Expr a) (Expr a)
+
+
+eval :: M.Map String a -> Expr a -> Either String a
+eval scope (ExprLit a) = Right a
+eval scope (ExprVar n) = case M.lookup n scope of
+    Just a -> Right a
+    Nothing -> Left $ "No such variable \"" ++ n ++ "\""
+eval scope (ExprUnOp op arg) = op <$> eval scope arg
+eval scope (ExprBinOp op argl argr) = op <$> eval scope argl <*> eval scope argr
+
+instance Num a => Num (Expr a) where
+    (+) = ExprBinOp (+)
+    (-) = ExprBinOp (-)
+    (*) = ExprBinOp (*)
+    negate = ExprUnOp negate
+    abs = ExprUnOp abs
+    signum = ExprUnOp signum
+    fromInteger = ExprLit . fromInteger
+
+instance Fractional a => Fractional (Expr a) where
+    fromRational = ExprLit . fromRational
+    (/) = ExprBinOp (/)
+
 -- Money == Ratio Integer
-operatorFunc '+' = (+)
-operatorFunc '-' = (-)
-operatorFunc '*' = (*)
-operatorFunc '/' = (/)
-operatorFunc _ = const  -- lalala
 
 variableName = do
     head <- varStart
     tail <- many varFollow
     return $ head:tail
 
-variable = do
-    name <- variableName
-    ps <- getState
-    case psGet name ps of
-        Nothing -> fail "No such variable"
-        Just value -> return value
+expr_lit = ExprLit <$> number
 
-expr_term = try expr_paren <|> try number <|> variable
+expr_var = ExprVar <$> variableName
 
 expr_paren = do
     char '('
     optWhitespace
-    e <- expr_sum
+    e <- expr
     optWhitespace
     char ')'
     return e
 
-expr_prod = do
-    lhs <- expr_term
-    rhs <- many $ try $ do
-        optWhitespace
-        op <- oneOf "*/"
-        optWhitespace
-        t <- expr_term
-        return ((operatorFunc op), t)
-    return $ foldl (\l (o, r) -> o l r) lhs rhs
+expr_term = do
+    e <- try expr_paren <|> try expr_lit <|> expr_var
+    optWhitespace
+    return e
 
-expr_signed_prod = do
-    sign <- option 1 $ char '-' >> return (-1 % 1)
-    e <- expr_prod
-    return $ sign * e
+expr_binop_mul = do { char '*'; optWhitespace; return (*) }
+expr_binop_div = do { char '/'; optWhitespace; return (/) }
+expr_binop_add = do { char '+'; optWhitespace; return (+) }
+expr_binop_sub = do { char '-'; optWhitespace; return (-) }
+expr_unop_neg = do { char '-'; optWhitespace; return negate }
 
-expr_sum = do
-    lhs <- expr_signed_prod
-    rhs <- many $ try $ do
-        optWhitespace
-        op <- oneOf "+-"
-        optWhitespace
-        t <- expr_signed_prod
-        return ((operatorFunc op), t)
-    return $ foldl (\l (o, r) -> o l r) lhs rhs
+expr_ops
+    = [
+        [Prefix expr_unop_neg],
+        [Infix expr_binop_mul AssocLeft, Infix expr_binop_div AssocLeft],
+        [Infix expr_binop_add AssocLeft, Infix expr_binop_sub AssocLeft]
+    ]
 
-money = expr_sum
+expr = buildExpressionParser expr_ops expr_term
+
+money = do
+    e <- expr
+    ps <- getState
+    case eval (psVariables ps) e of
+        Left error -> fail error
+        Right result -> return result
 
 -- [Share]
 share_person = do
