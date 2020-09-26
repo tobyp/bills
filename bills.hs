@@ -70,7 +70,6 @@ currencyCode = count 3 large
 
 -- Ratio Integer
 number = do
-    sign <- option (1) ((char '-') >> (return (-1 % 1)))
     intpart <- many1 digit
     fracpart <- option (0 % 1) $ do {
         decimalSeparator;
@@ -97,7 +96,15 @@ variable = do
         Nothing -> fail "No such variable"
         Just value -> return value
 
-expr_term = try number <|> variable
+expr_term = try expr_paren <|> try number <|> variable
+
+expr_paren = do
+    char '('
+    optWhitespace
+    e <- expr_sum
+    optWhitespace
+    char ')'
+    return e
 
 expr_prod = do
     lhs <- expr_term
@@ -109,13 +116,18 @@ expr_prod = do
         return ((operatorFunc op), t)
     return $ foldl (\l (o, r) -> o l r) lhs rhs
 
+expr_signed_prod = do
+    sign <- option 1 $ char '-' >> return (-1 % 1)
+    e <- expr_prod
+    return $ sign * e
+
 expr_sum = do
-    lhs <- expr_prod
+    lhs <- expr_signed_prod
     rhs <- many $ try $ do
         optWhitespace
         op <- oneOf "+-"
         optWhitespace
-        t <- expr_prod
+        t <- expr_signed_prod
         return ((operatorFunc op), t)
     return $ foldl (\l (o, r) -> o l r) lhs rhs
 

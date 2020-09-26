@@ -1,0 +1,5 @@
+flow: A consumed 3.0 and owes 2.0 (so, is out 1.0)
+flow: B consumed 1.0 and is owed 1.0 (so, is out 2.0)
+flow: C consumed 2.0 and is owed 1.0 (so, is out 3.0)
+todo: A pays 1.0 to B
+todo: A pays 1.0 to C
