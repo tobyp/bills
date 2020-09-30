@@ -36,10 +36,14 @@ for test_input in "${test_inputs[@]}"; do
 	test_name="${test_input_base%.*}";
 	test_exp_stdout="${test_input%.*}.stdout";
 	test_exp_stderr="${test_input%.*}.stderr";
-	test_cmd="./bills ${test_input}"
+	test_cmd="${test_input}"
 
-	if [ -x "${test_input}" ]; then
-		test_cmd="./${test_input}";
+	echo "Running test \"${test_name}\"...";
+
+	if [ ! -x "${test_input}" ]; then
+		echo " -> ${RED}FAILED!${RESET} (not executable)";
+		tests_failed=$(( $tests_failed + 1 ));
+		continue;
 	fi
 
 	if [[ "${test_name}" == *"-FAIL" ]]; then
@@ -50,7 +54,6 @@ for test_input in "${test_inputs[@]}"; do
 
 	test_run_stdout="$(mktemp ${test_name}-XXXXXX.stdout)";
 	test_run_stderr="$(mktemp ${test_name}-XXXXXX.stderr)";
-	echo "Running test \"${test_name}\"...";
 	${test_cmd} >"${test_run_stdout}" 2>"${test_run_stderr}";
 	test_result=$?;
 	diff_result=0;
@@ -86,8 +89,8 @@ done
 echo ""
 if [ $tests_failed != 0 ]; then
 	echo "${RED}${tests_failed} tests failed! (of ${tests_count})${RESET}";
+	exit 1;
 else
 	echo "${GREEN}All ${tests_count} tests passed :)${RESET}";
+	exit 0;
 fi
-
-exit $result;

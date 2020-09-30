@@ -11,7 +11,7 @@ import System.Environment
 import System.Exit
 import System.IO
 
-kVERSION = "2.0.2"
+kVERSION = "2.0.3"
 
 type Person = String
 type Weight = Ratio Integer

@@ -70,7 +70,7 @@ ghc bills.hs -o bills
 ## Usage
 
 ```
-bills < example.txt
+bills example.txt
 ```
 
 ## Algorithm
@@ -86,19 +86,19 @@ Once all transactions are tracked, people with positive balances (who got more t
 
 ```
 # Bill 1: Mom-&-Pop Store, 1970-01-01
-A	BC	2.00	# A paid 2.00, benefiting B and C
-A	A	5.00	# A paid 5.00, but only for themselves
-A	ABC	10.00	# A paid 10.00, and whatever was bought got split evenly.
+A	BC.	2.00	# A paid 2.00, benefiting B and C
+A	A.	5.00	# A paid 5.00, but only for themselves
+A	ABC.	10.00	# A paid 10.00, and whatever was bought got split evenly.
 
 # Bill 2: Hot Dog Stand, 1970-01-02
-B	A	2.00
-B	AB	3.00
+B	A.	2.00
+B	AB.	3.00
 
 # Cash exchange
-C	B	8.88	# C gave B some cash
+C	B.	8.88	# C gave B some cash
 
 # Bill 3: Tickets, Stadium, 1970-01-05
-A,B		AB,2C		# A and B each paid half of the tickets, which included one for each of them and 2 for C
+A,B		AB,2C.		# A and B each paid half of the tickets, which included one for each of them and 2 for C
 ```
 
 ### Output

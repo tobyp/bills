@@ -6,7 +6,7 @@ steps:
   image: docker-registry.tobyp.net/tobyp/docker-drone-makepkg
   environment:
     PKGBUILD_DIR: contrib/aur
-    PKGBUILD_SRC_OVERRIDE: "git+https://git.tobyp.net/tobyp/bills-hs.git"
+    PKGBUILD_SRC_OVERRIDE: "git+https://github.com/tobyp/bills.git"
 
 - name: repo-add
   image: docker-registry.tobyp.net/tobyp/docker-drone-pacman-package-deploy

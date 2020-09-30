@@ -1,28 +1,28 @@
 pkgname=bills
 pkgver=0
 pkgrel=1
-pkgdesc="Bills "
+pkgdesc="Bills"
 arch=('any')
 license=('MIT')
 depends=('gmp' 'libffi')
 makedepends=('ghc-static')
-source=("git+https://git.tobyp.net/tobyp/bills-hs.git")
+source=("git+https://github.com/tobyp/bills.git")
 sha512sums=('SKIP')
 
 pkgver() {
-	sed -n 's/kVERSION\s*=\s*"\([^"]\+\)"/\1/p' "${srcdir}/bills-hs/bills.hs"
+	sed -n 's/kVERSION\s*=\s*"\([^"]\+\)"/\1/p' "${srcdir}/bills/bills.hs"
 }
 
 build() {
-	cd "bills-hs"
+	cd "bills"
 	make bills
 }
 
 check() {
-	cd "bills-hs"
+	cd "bills"
 	make check
 }
 
 package() {
-	install -Dm755 "bills-hs/bills" "${pkgdir}/usr/bin/bills"
+	install -Dm755 "bills/bills" "${pkgdir}/usr/bin/bills"
 }
